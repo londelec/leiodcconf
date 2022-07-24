@@ -17,6 +17,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
@@ -24,6 +25,7 @@ import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 
@@ -60,14 +62,15 @@ public class LeiodcMain extends javax.swing.JFrame {
     private static TabDevConfig panelDevCfg;
     private static TabConnection panelComms;
     private JMenuItem menuItemAbout, menuItemSettings, menuItemRestart, menuItemDump, menuItemExit;
+    private JCheckBoxMenuItem menuItemRetainComVals;
     private javax.swing.JLabel labelActivity;
     private javax.swing.JPanel ledActivity;
     private static int actshow;
     private static long actTime;
     private static boolean devonline;
 
-    private static final String SWVERSION = "V1.0";
-    private static final String COPYRIGHT = "© 2020 Londelec UK Ltd\nThis program comes with absolutely no warranty.";
+    private static final String SWVERSION = "V1.1";
+    private static final String COPYRIGHT = "© 2022 Londelec UK Ltd\nThis program comes with absolutely no warranty.";
     private static String buildDate = "Not available";
 
     private final SyncPort syncPort = new SyncPort();
@@ -79,17 +82,32 @@ public class LeiodcMain extends javax.swing.JFrame {
      * Library path on various OS:
      *
      * os.name: Linux
+     * os.arch: amd64
+     * java.library.path:
+     *  /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/amd64:
+     *  /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/i386:
+     *  :
+     *  /usr/java/packages/lib/amd64:
+     *  /usr/lib/x86_64-linux-gnu/jni:
+     *  /lib/x86_64-linux-gnu:
+     *  /usr/lib/x86_64-linux-gnu:
+     *  /usr/lib/jni:
+     *  /lib:
+     *  /usr/lib
+     *
+     * os.name: Linux
      * os.arch: i386
      * java.library.path:
      *  /usr/lib/jvm/java-8-openjdk-i386/jre/lib/amd64:
      *  /usr/lib/jvm/java-8-openjdk-i386/jre/lib/i386:
+     *  :
      *  /usr/java/packages/lib/i386:
      *  /usr/lib/i386-linux-gnu/jni:
      *  /lib/i386-linux-gnu:
      *  /usr/lib/i386-linux-gnu:
      *  /usr/lib/jni:
      *  /lib:
-     *  /usr/lib:.
+     *  /usr/lib:
      *
      * C:\Users\VBox\Documents\leiodctool>java -jar leiodctool.jar
      * os.name: Windows 7
@@ -98,7 +116,7 @@ public class LeiodcMain extends javax.swing.JFrame {
      *  C:\ProgramData\Oracle\Java\javapath;
      *  C:\Windows\Sun\Java\bin;
      *  C:\Windows\system32;
-     *  C:\Windows;.
+     *  C:\Windows;
      *
      * C:\Program Files\Java\jre1.8.0_261\bin>java -jar d:\Documents\LEIODC\leiodctool.jar
      * os.name: Windows 7
@@ -108,7 +126,7 @@ public class LeiodcMain extends javax.swing.JFrame {
      *  C:\Windows\Sun\Java\bin;
      *  C:\Program Files (x86)\Common Files\Oracle\Java\javapath;
      *  C:\Windows\system32;
-     *  C:\Windows;.
+     *  C:\Windows;
      *
      */
     public LeiodcMain() {
@@ -251,9 +269,18 @@ public class LeiodcMain extends javax.swing.JFrame {
 
                 if (openp == false) {
                     modthread.pollToggle(true);   // This is synchronized, may block
-                    fwversion = -1;
                     TPane.remove(panelDevCfg);
                     panelDevCfg = null;
+                    fwversion = -1;
+                    if (!menuItemRetainComVals.isSelected()) {
+                        TabConnection.ttab.clearTable();
+                    }
+                }
+                else {
+                    for (int i = 0; i < devcom.length; i++) {
+                        devcom[i] = -1;
+                    }
+                    fwversion = -1;
                     TabConnection.ttab.clearTable();
                 }
 
@@ -355,6 +382,7 @@ public class LeiodcMain extends javax.swing.JFrame {
 
         public void advancedMode() {
             jMenuDevice.setVisible(true);
+            menuItemRetainComVals.setVisible(true);
         }
     }
 
@@ -694,6 +722,11 @@ public class LeiodcMain extends javax.swing.JFrame {
         });
         jMenuHelp.add(menuItemAbout);
 
+        menuItemRetainComVals = new JCheckBoxMenuItem("Retain COM values");
+        menuItemRetainComVals.setToolTipText("Retain LEIODC COM settings in the table when port is closed");
+        menuItemRetainComVals.setVisible(false);
+        jMenuHelp.add(menuItemRetainComVals);
+
         menuItemSettings = new JMenuItem("Settings", KeyEvent.VK_S);
         menuItemSettings.addActionListener(new ActionListener() {
             @Override
@@ -704,6 +737,7 @@ public class LeiodcMain extends javax.swing.JFrame {
         jMenuEdit.add(menuItemSettings);
 
         menuItemRestart = new JMenuItem("Restart", KeyEvent.VK_R);
+        menuItemRestart.setToolTipText("Restart LEIODC device");
         menuItemRestart.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
@@ -713,6 +747,7 @@ public class LeiodcMain extends javax.swing.JFrame {
         jMenuDevice.add(menuItemRestart);
 
         menuItemDump = new JMenuItem("Dump Config", KeyEvent.VK_D);
+        menuItemDump.setToolTipText("Dump LEIODC's user configuration to leiodc.txt");
         menuItemDump.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
@@ -782,7 +817,7 @@ public class LeiodcMain extends javax.swing.JFrame {
         String osname = System.getProperty("os.name");
         boolean is64bit = false;
         File libFile;
-        String libpath;
+        String libpath, localname;
         Path link, target;
 
         if (System.getProperty("os.arch").contains("64"))
@@ -790,45 +825,51 @@ public class LeiodcMain extends javax.swing.JFrame {
 
         if (osname.toLowerCase().contains("linux")) {
             if ((libpath = findLibpath(":", "jni")) == null) {
-                return;
+                actionExit(null);
             }
 
             //libFile = new File("/home/dell/test.bin");
             //libpath = "/home/dell";
             libFile = new File(libpath + "/librxtxSerial.so");
+            link = libFile.toPath();
             if (libFile.exists()) {
                 //System.out.println("Link librxtxSerial.so found in " + libpath);
                 return;
             }
 
-            if (!(new File(libpath)).canWrite()) {
-                System.out.println("No write permissions to copy librxtxSerial.so to " + libpath);
-                actionExit(null);
-            }
-
-            link = libFile.toPath();
-            libFile = new File(libpath + "/librxtxSerial-2.2pre1.so");
-            target = libFile.toPath();
-
             if (is64bit) {
-                System.out.println("Linux 64bit found");
-                //copyLibrary("/leiodctool/rxtxSerial_x64.dll", libFile);
-                // TODO need to copy library on 64bit Linux
-                System.out.println("You need to copy librxtxSerial-xxxxx.so to " + libpath);
+                //System.out.println("Linux 64bit found");
+                localname = "libNRJavaSerial_x64.so";
             }
             else {
                 //System.out.println("Linux 32bit found");
-                if (!copyLibrary("/leiodctool/librxtxSerial-2.2pre1.so", libFile)) {
-                    try {
-                        Files.createSymbolicLink(link, target);
-                    } catch (IOException ex) {
-                        if ((ex.toString().indexOf("FileAlreadyExistsException")) < 0)   // Ignore error if link already exists
-                            Logger.getLogger(LeiodcMain.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    return;
-                }
-                System.out.println("You need to copy librxtxSerial-2.2pre1.so to " + libpath);
+                localname = "libNRJavaSerial_x86.so";
             }
+
+            if (!(new File(libpath)).canWrite()) {
+                System.out.println("No write permissions to copy " + localname + " to " + libpath);
+                actionExit(null);
+            }
+
+            target = new File(localname).toPath();
+            libFile = new File(libpath + "/" + localname);
+
+            if (!copyLibrary("/leiodctool/" + localname, libFile)) {
+                boolean success = false;
+                try {
+                    Files.createSymbolicLink(link, target);
+                    success = true;
+                } catch (IOException ex) {
+                    if ((ex.toString().indexOf("FileAlreadyExistsException")) < 0)   // Ignore error if link already exists
+                        Logger.getLogger(LeiodcMain.class.getName()).log(Level.SEVERE, null, ex);
+                    else
+                        success = true;
+                }
+                if (success)
+                    System.out.println(localname + " successfully copied to " + libpath);
+                return;
+            }
+            System.out.println("You need to copy " + localname + " to " + libpath);
             actionExit(null);
         }
         else if (osname.toLowerCase().contains("windows")) {
@@ -842,16 +883,18 @@ public class LeiodcMain extends javax.swing.JFrame {
 
             if (is64bit) {
                 //System.out.println("Windows 64bit found");
-                if (copyLibrary("/leiodctool/rxtxSerial_x64.dll", libFile)) {
-                    actionExit(null);
-                }
+                localname = "libNRJavaSerial_x64.dll";
             }
             else {
                 //System.out.println("Windows 32bit found");
-                if (copyLibrary("/leiodctool/rxtxSerial_x86.dll", libFile)) {
-                    actionExit(null);
-                }
+                localname = "libNRJavaSerial_x86.dll";
             }
+
+            if (copyLibrary("/leiodctool/" + localname, libFile)) {
+                System.out.println("Can't copy rxtxSerial.dll to " + libpath + " make sure to run java as Administrator");
+                actionExit(null);
+            }
+            System.out.println(localname + " successfully copied and renamed to " + libpath + "\\rxtxSerial.dll");
         }
     }
 
@@ -865,6 +908,15 @@ public class LeiodcMain extends javax.swing.JFrame {
                 tempDir = new File(libpath[i]);
                 if (tempDir.exists())
                     return libpath[i];
+                else {
+                    Path newpath = Paths.get(libpath[i]);
+                    try {
+                        Files.createDirectories(newpath);
+                        return libpath[i];
+                    } catch (IOException ex) {
+                        System.out.println("Can't create directory: " + ex.toString());
+                    }
+                }
             }
         }
         return null;
@@ -876,7 +928,7 @@ public class LeiodcMain extends javax.swing.JFrame {
         InputStream ilink = (getClass().getResourceAsStream(libname));
 
         if (ilink == null) {
-            System.out.println("Cant't find " + libname + " in jar file" );
+            System.out.println("Cant't find " + libname + " in jar file");
             return true;
         }
 
@@ -911,7 +963,7 @@ public class LeiodcMain extends javax.swing.JFrame {
             filepath = filepath.substring(0, filepath.indexOf("!/"));
         }
         else {  // When Debugging
-            filepath = "jar:file:/home/dell/Documents/Firmware/java/LEIODCconf/dist/leiodctool.jar";
+            filepath = "jar:file:/home/dell/Documents/Code/java/LEIODCconf/dist/leiodctool.jar";
         }
         //System.out.println("trimmed " + filepath);
 
@@ -995,7 +1047,7 @@ public class LeiodcMain extends javax.swing.JFrame {
     private javax.swing.JPanel PanelSampleGroup;
     private javax.swing.JPanel PanelSampleIO1;
     private javax.swing.JPanel PanelSampleIO2;
-    private javax.swing.JTabbedPane TPane;
+    private static javax.swing.JTabbedPane TPane;
     private javax.swing.JTextField TextSampleIO1;
     private javax.swing.JTextField TextSampleIO2;
     private javax.swing.JMenuBar jMenuBar;

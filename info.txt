@@ -1,0 +1,50 @@
+=======================================
+rxtxSerial library:
+=======================================
+rxtx libraries (*.so and *.dll) for Windows/Linux 32bit and 64bit downloaded from:
+https://github.com/NeuronRobotics/nrjavaserial/tree/master/src/main/c/resources/native
+
+RXTXcomm.jar downloaded from:
+http://rxtx.qbang.org/pub/rxtx/rxtx-2.2pre2-bins.zip
+
+Version string in *.so and *.dll libraries:
+  'RXTX-2.2pre2'
+Version of RXTXcomm.jar can be checked in RXTXcomm.jar/gnu/io/RXTXVersion.class
+  'RXTX-2.2pre1'
+
+
+This warning or startup is normal:
+WARNING:  RXTX Version mismatch
+	Jar version = RXTX-2.2pre1
+	native lib Version = RXTX-2.2pre2
+
+TODO: The 2.2pre2 bins contain the 2.2pre1 jar file and the 2.2pre2 native lib which causes a mismatch warning
+
+
+The following libraries crash on Windows 64bit with JRE 1.8.0_341 and later
+(Works fine with JRE 1.8.0_101-b13; VM 25.101-b13 on Windows 64bit and 32bit)
+
+http://rxtx.qbang.org/wiki/index.php/Download
+http://fizzed.com/oss/rxtx-for-java
+https://github.com/cmu-create-lab/commons-java
+
+Helpful info: 
+https://giters.com/rxtx/rxtx/issues/20
+
+
+Java JRE library path can be checked:
+  System.out.println(System.getProperty("java.library.path")); 
+  java -XshowSettings:properties
+
+
+=======================================
+Advanced mode:
+=======================================
+LEIODC tool has a hidden menu that is only available in Advanced mode.
+In order to enter Advanced mode, hold down the left Ctrl key and right-click mouse on the 'OK' button of the Communication settings dialog.
+New entry 'Device' will appear in the main menu.
+It is possible to Restart LEIODC device and dump configuration in Advanced mode.
+
+
+24/07/2022
+AK
